@@ -57,7 +57,7 @@ class Exception : public std::runtime_error {
    */
   explicit Exception(const std::string &message) : std::runtime_error(message), type_(ExceptionType::INVALID) {
     std::string exception_message = "Message :: " + message + "\n";
-    std::cerr << exception_message;
+  //  std::cerr << exception_message;
   }
 
   /**
@@ -69,7 +69,7 @@ class Exception : public std::runtime_error {
       : std::runtime_error(message), type_(exception_type) {
     std::string exception_message =
         "\nException Type :: " + ExceptionTypeToString(type_) + "\nMessage :: " + message + "\n";
-    std::cerr << exception_message;
+  //  std::cerr << exception_message;
   }
 
   /** @return The type of the exception */

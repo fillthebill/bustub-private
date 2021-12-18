@@ -34,11 +34,10 @@ static bool ThrowsBustubException(const std::function<void()> &function, Excepti
     function();
   } catch (const Exception &e) {
     expected_type_thrown = e.GetType() == type;
-    //std::cout<< e.GetType() <<std::endl;
+    // std::cout<< e.GetType() <<std::endl;
   }
   return expected_type_thrown;
 }
-
 
 TEST(StarterTest, SampleTest) {
   int a = 1;
@@ -46,7 +45,7 @@ TEST(StarterTest, SampleTest) {
 }
 
 /** Test that matrix initialization works as expected */
-TEST(StarterTest,InitializationTest) {
+TEST(StarterTest, InitializationTest) {
   auto matrix = std::make_unique<RowMatrix<int>>(2, 2);
 
   // Source contains too few elements
@@ -54,14 +53,12 @@ TEST(StarterTest,InitializationTest) {
   std::iota(source0.begin(), source0.end(), 0);
   EXPECT_TRUE(ThrowsBustubException([&]() { matrix->FillFrom(source0); }, ExceptionType::OUT_OF_RANGE));
 
-
-        // Source contains too many elements
+  // Source contains too many elements
   std::vector<int> source1(5);
   std::iota(source1.begin(), source1.end(), 0);
   EXPECT_TRUE(ThrowsBustubException([&]() { matrix->FillFrom(source1); }, ExceptionType::OUT_OF_RANGE));
 
-
-        // Just right
+  // Just right
   std::vector<int> source2(4);
   std::iota(source2.begin(), source2.end(), 0);
   EXPECT_NO_THROW(matrix->FillFrom(source2));
@@ -161,7 +158,7 @@ TEST(StarterTest, AdditionTest) {
 }
 
 /** Test that matrix multiplication works as expected */
-TEST(StarterTest,MultiplicationTest) {
+TEST(StarterTest, MultiplicationTest) {
   const std::vector<int> source0{1, 2, 3, 4, 5, 6};
   auto matrix0 = std::make_unique<RowMatrix<int>>(2, 3);
   matrix0->FillFrom(source0);

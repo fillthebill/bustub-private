@@ -21,18 +21,19 @@ namespace bustub {
 
 // NOLINTNEXTLINE
 // Check whether pages containing terminal characters can be recovered
-TEST(ParallelBufferPoolManagerTest, DISABLED_BinaryDataTest) {
+TEST(ParallelBufferPoolManagerTest, BinaryDataTest) {
   const std::string db_name = "test.db";
   const size_t buffer_pool_size = 10;
   const size_t num_instances = 5;
-
+  std::cout << "initialization" << std::endl;
   std::random_device r;
   std::default_random_engine rng(r());
   std::uniform_int_distribution<char> uniform_dist(0);
 
   auto *disk_manager = new DiskManager(db_name);
+  std::cout << "before construction" << std::endl;
   auto *bpm = new ParallelBufferPoolManager(num_instances, buffer_pool_size, disk_manager);
-
+  std::cout << "created" << std::endl;
   page_id_t page_id_temp;
   auto *page0 = bpm->NewPage(&page_id_temp);
 
@@ -49,6 +50,8 @@ TEST(ParallelBufferPoolManagerTest, DISABLED_BinaryDataTest) {
   // Insert terminal characters both in the middle and at end
   random_binary_data[PAGE_SIZE / 2] = '\0';
   random_binary_data[PAGE_SIZE - 1] = '\0';
+
+  std::cout << "got a page" << std::endl;
 
   // Scenario: Once we have a page, we should be able to read and write content.
   std::memcpy(page0->GetData(), random_binary_data, PAGE_SIZE);
@@ -88,7 +91,7 @@ TEST(ParallelBufferPoolManagerTest, DISABLED_BinaryDataTest) {
 }
 
 // NOLINTNEXTLINE
-TEST(ParallelBufferPoolManagerTest, DISABLED_SampleTest) {
+TEST(ParallelBufferPoolManagerTest, SampleTest) {
   const std::string db_name = "test.db";
   const size_t buffer_pool_size = 10;
   const size_t num_instances = 5;

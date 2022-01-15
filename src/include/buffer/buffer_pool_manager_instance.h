@@ -28,6 +28,8 @@ namespace bustub {
  * BufferPoolManager reads disk pages to and from its internal buffer pool.
  */
 class BufferPoolManagerInstance : public BufferPoolManager {
+  friend class ParallelBufferPoolManager;
+
  public:
   /**
    * Creates a new BufferPoolManagerInstance.
@@ -134,7 +136,7 @@ class BufferPoolManagerInstance : public BufferPoolManager {
   Page *pages_;
   /** Pointer to the disk manager. */
   DiskManager *disk_manager_ __attribute__((__unused__));
-  /** Pointer to the log manager. */
+  /** Pointer to the log manager */
   LogManager *log_manager_ __attribute__((__unused__));
   /** Page table for keeping track of buffer pool pages. */
   std::unordered_map<page_id_t, frame_id_t> page_table_;
@@ -142,7 +144,9 @@ class BufferPoolManagerInstance : public BufferPoolManager {
   Replacer *replacer_;
   /** List of free pages. */
   std::list<frame_id_t> free_list_;
-  /** This latch protects shared data structures. We recommend updating this comment to describe what it protects. */
+  /** This latch protects shared data structures. We recommend updating this comment to describe what it protects.
+   * used when data member is changed.
+   * */
   std::mutex latch_;
 };
 }  // namespace bustub

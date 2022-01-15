@@ -40,6 +40,8 @@ class HashTableBucketPage {
   // Delete all constructor / destructor to ensure memory safety
   HashTableBucketPage() = delete;
 
+  MappingType* GetData();
+
   /**
    * Scan the bucket and collect values that have the matching key
    *
@@ -138,9 +140,17 @@ class HashTableBucketPage {
    */
   void PrintBucket();
 
+  uint8_t CalculateMask (uint32_t bucket_idx) const;
+
  private:
   // For more on BUCKET_ARRAY_SIZE see storage/page/hash_table_page_defs.h
   char occupied_[(BUCKET_ARRAY_SIZE - 1) / 8 + 1];
+  // a note on the len of char[] occupied_: BUCKET_ARRAY_SIZE is the number of key,value paris that could be contained in a bucketpage
+  // char occupies a byte, or to say 8 bits. here we need one bit to represent the status of a key-value pair. 
+  // generraly, one way to calculate the number of chars needed is to divied the number of pairs by 8, 
+  // the solution adopted here is a more accurate one, with corner cases well considered.
+
+
   // 0 if tombstone/brand new (never occupied), 1 otherwise.
   char readable_[(BUCKET_ARRAY_SIZE - 1) / 8 + 1];
   // Do not add any members below array_, as they will overlap.

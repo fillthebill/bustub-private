@@ -17,10 +17,47 @@ namespace bustub {
 NestedLoopJoinExecutor::NestedLoopJoinExecutor(ExecutorContext *exec_ctx, const NestedLoopJoinPlanNode *plan,
                                                std::unique_ptr<AbstractExecutor> &&left_executor,
                                                std::unique_ptr<AbstractExecutor> &&right_executor)
-    : AbstractExecutor(exec_ctx) {}
+    : AbstractExecutor(exec_ctx), plan_(plan), left_executor_(std::move(left_executor)), right_executor_(std::move(right_executor)),
+    result_{} {}
 
-void NestedLoopJoinExecutor::Init() {}
+void NestedLoopJoinExecutor::Init() {
+// for each tuple in the left child, see if it match with tuple in the right child.
+	Tuple left_tuple;
+	Tuple right_tuple;
+	RID left_rid;
+	RID right_rid;
 
-bool NestedLoopJoinExecutor::Next(Tuple *tuple, RID *rid) { return false; }
+	auto out_schema = GetOutputSchema();
+	std::vector<Value> temp_result;
+	temp_result.reserve(out_schema->GetColumnCount());
+
+	left_executor_ ->Init();
+	while (left_executor_->Next(&left_tuple, &left_rid)) { //see execution/executors/abstract_executor for declaration.
+		right_executor_ ->Init();
+		
+		while (right_executor_->Next(&right_tuple, &right_rid)) {
+			if (plan_->Predicate()->EvaluateJoin(&left_tuple, left_executor_->GetOutputSchema(),
+			 &right_tuple, right_executor_->GetOutputSchema()).GetAs<bool>() || plan_ == nullptr) {
+				
+				for(auto &col : out_schema->GetColumns()) {
+					temp_result.push_back(col.GetExpr()->EvaluateJoin(&left_tuple, left_executor_->GetOutputSchema(),
+						&right_tuple, right_executor_->GetOutputSchema()));  // return value based on left/right sideness of cur col.
+				}
+				result_.push_back(Tuple(temp_result, out_schema));
+				temp_result.clear();  // in case lots of tuple to traverse, save memory to some extent by using the same vector.
+			}
+
+		}
+	}
+	size_ = result_.size();
+}
+
+bool NestedLoopJoinExecutor::Next(Tuple *tuple, RID *rid) { 
+	if (cur_id_ < size_) {
+		*tuple = result_[cur_id_];
+		return true;
+	}
+	return false;
+}
 
 }  // namespace bustub

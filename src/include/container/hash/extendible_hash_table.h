@@ -137,7 +137,7 @@ class ExtendibleHashTable {
   HASH_TABLE_BUCKET_TYPE *FetchBucketPage(page_id_t bucket_page_id);
 
   /**
-   * Performs insertion with an optional bucket splitting.  If the 
+   * Performs insertion with an optional bucket splitting.  If the
    * page is still full after the split, then recursively split.
    * This is exceedingly rare, but possible.
    *
@@ -146,7 +146,9 @@ class ExtendibleHashTable {
    * @param value the value to insert
    * @return whether or not the insertion was successful
    */
-  bool SplitInsert(Transaction *transaction, const KeyType &key, const ValueType &value);
+bool SplitInsert(page_id_t buc_page_id, HASH_TABLE_BUCKET_TYPE* split_page, const KeyType &key, const ValueType &value);
+
+bool Split_Rehash(HashTableDirectoryPage* dir_page, HASH_TABLE_BUCKET_TYPE* split_page, uint32_t split_index);
 
   /**
    * Optionally merges an empty bucket into it's pair.  This is called by Remove,
@@ -156,14 +158,14 @@ class ExtendibleHashTable {
    * 1. The bucket is no longer empty.
    * 2. The bucket has local depth 0.
    * 3. The bucket's local depth doesn't match its split image's local depth.
-   * 
+   *
    * Note: we do not merge recursively.
    *
    * @param transaction a pointer to the current transaction
    * @param key the key that was removed
    * @param value the value that was removed
    */
-  void Merge(Transaction *transaction, const KeyType &key, const ValueType &value);
+void Merge(HashTableDirectoryPage* dir_page, uint32_t merge_index, uint32_t image_index);
 
   // member variables
   page_id_t directory_page_id_;

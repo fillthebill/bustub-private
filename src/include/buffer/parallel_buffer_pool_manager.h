@@ -12,7 +12,10 @@
 
 #pragma once
 
+#include <vector>
+
 #include "buffer/buffer_pool_manager.h"
+#include "buffer/buffer_pool_manager_instance.h"
 #include "recovery/log_manager.h"
 #include "storage/disk/disk_manager.h"
 #include "storage/page/page.h"
@@ -20,6 +23,10 @@
 namespace bustub {
 
 class ParallelBufferPoolManager : public BufferPoolManager {
+ private:
+  std::vector<BufferPoolManagerInstance *> bpmi_;
+  uint32_t starting_index_ = 0;
+
  public:
   /**
    * Creates a new ParallelBufferPoolManager.

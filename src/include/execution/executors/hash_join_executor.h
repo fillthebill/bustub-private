@@ -14,11 +14,42 @@
 
 #include <memory>
 #include <utility>
+#include <vector>
+#include <unordered_map>
 
+#include "common/util/hash_util.h"
 #include "execution/executor_context.h"
 #include "execution/executors/abstract_executor.h"
+#include "execution/expressions/abstract_expression.h"
 #include "execution/plans/hash_join_plan.h"
 #include "storage/table/tuple.h"
+
+
+namespace bustub {
+
+struct HashJoinKey {
+  Value keys_;
+  bool operator==(const HashJoinKey &other) const {
+    return keys_.CompareEquals(other.keys_) == CmpBool::CmpTrue;
+  }
+};
+
+}  // namespace bustub
+
+namespace std {
+
+template <>
+struct hash<bustub::HashJoinKey> {
+  std::size_t operator()(const bustub::HashJoinKey &hash_key) const {
+    size_t curr_hash = 0;
+    if (!hash_key.keys_.IsNull()) {
+      curr_hash = bustub::HashUtil::CombineHashes(curr_hash, bustub::HashUtil::HashValue(&hash_key.keys_));
+    }
+    return curr_hash;
+  }
+};
+
+}  // namespace std
 
 namespace bustub {
 
@@ -54,6 +85,12 @@ class HashJoinExecutor : public AbstractExecutor {
  private:
   /** The NestedLoopJoin plan node to be executed. */
   const HashJoinPlanNode *plan_;
+  std::unique_ptr<AbstractExecutor> left_executor_;
+  std::unique_ptr<AbstractExecutor> right_executor_;
+  std::unordered_map<HashJoinKey, std::vector<Tuple>> map_{};
+  std::vector<Tuple> result_;
+  uint32_t size_ = 0;
+  uint32_t cur_id = 0;
 };
 
 }  // namespace bustub

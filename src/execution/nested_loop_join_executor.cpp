@@ -22,6 +22,8 @@ NestedLoopJoinExecutor::NestedLoopJoinExecutor(ExecutorContext *exec_ctx, const 
 
 void NestedLoopJoinExecutor::Init() {
 // for each tuple in the left child, see if it match with tuple in the right child.
+	size_ = 0;
+	cur_id_ = 0;
 	Tuple left_tuple;
 	Tuple right_tuple;
 	RID left_rid;
@@ -36,8 +38,8 @@ void NestedLoopJoinExecutor::Init() {
 		right_executor_ ->Init();
 		
 		while (right_executor_->Next(&right_tuple, &right_rid)) {
-			if (plan_->Predicate()->EvaluateJoin(&left_tuple, left_executor_->GetOutputSchema(),
-			 &right_tuple, right_executor_->GetOutputSchema()).GetAs<bool>() || plan_ == nullptr) {
+			if (plan_ == nullptr || plan_->Predicate()->EvaluateJoin(&left_tuple, left_executor_->GetOutputSchema(),
+			 &right_tuple, right_executor_->GetOutputSchema()).GetAs<bool>() ) {
 				
 				for(auto &col : out_schema->GetColumns()) {
 					temp_result.push_back(col.GetExpr()->EvaluateJoin(&left_tuple, left_executor_->GetOutputSchema(),
@@ -55,6 +57,7 @@ void NestedLoopJoinExecutor::Init() {
 bool NestedLoopJoinExecutor::Next(Tuple *tuple, RID *rid) { 
 	if (cur_id_ < size_) {
 		*tuple = result_[cur_id_];
+		cur_id_++;
 		return true;
 	}
 	return false;

@@ -34,7 +34,6 @@ void AggregationExecutor::Init() {
 }
 
 bool AggregationExecutor::Next(Tuple *tuple, RID *rid) {
-
 	std::vector<Value> groupby;
 	std::vector<Value> aggregate;
 	do {
@@ -45,8 +44,7 @@ bool AggregationExecutor::Next(Tuple *tuple, RID *rid) {
 		groupby = aht_iterator_.Key().group_bys_;
 		aggregate = aht_iterator_.Val().aggregates_;
 		++aht_iterator_;
-
-	} while (plan_->GetHaving()!=nullptr && !plan_->GetHaving()->EvaluateAggregate(groupby, aggregate).GetAs<bool>());
+	} while (plan_->GetHaving() != nullptr && !plan_->GetHaving()->EvaluateAggregate(groupby, aggregate).GetAs<bool>());
 
 	std::vector<Value> result;
 	uint32_t col_num = plan_->OutputSchema()->GetColumnCount();

@@ -22,7 +22,7 @@
 // ox --0abcd, ---1abcd maps to the same bucket page. that is, the content in bucket_page_id[0ab] = bucket_page_id[1ab];
 // before the expansion, we only care about the lower two bits.
 // mbits, -- m+1 bits, directory id from [0, 2^m - 1] to [0, 2^(m+1) - 1];
-// from 2^m to 2^(m+1) - 1; finding directory_id which saves the same 
+// from 2^m to 2^(m+1) - 1; finding directory_id which saves the same
 //  page_id using bit mask. before expansion, we have the mask:
 // 2^global_depth -1; after expasion, 2^(global_depth+1) - 1;
 
@@ -45,7 +45,8 @@ uint32_t HashTableDirectoryPage::GetGlobalDepthMask() { return (1 << global_dept
 void HashTableDirectoryPage::IncrGlobalDepth() {
   // the size of array "bucket page ids" doubles, then
   // global_depth_
-  for (uint32_t i = (1 << global_depth_); i < (1 << (global_depth_+1)); ++i) {
+  uint32_t n = (1 << (global_depth_+1));
+  for (uint32_t i = (1 << global_depth_); i < n; ++i) {
     bucket_page_ids_[i] = bucket_page_ids_[i-(1 << global_depth_)];
     local_depths_[i] = local_depths_[i-(1 << global_depth_)];
   }
@@ -65,8 +66,11 @@ void HashTableDirectoryPage::SetBucketPageId(uint32_t bucket_idx, page_id_t buck
 uint32_t HashTableDirectoryPage::Size() { return 1 << global_depth_; }
 
 bool HashTableDirectoryPage::CanShrink() {
-  for (uint32_t i = 0; i < (1 << global_depth_); ++i) {
-    if (local_depths_[i] == global_depth_) return false;
+  uint32_t n = (1 << global_depth_);
+  for (uint32_t i = 0; i < n; ++i) {
+    if (local_depths_[i] == global_depth_) {
+      return false;
+    }
   }
   return true;
 }

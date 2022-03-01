@@ -107,7 +107,8 @@ enum class AbortReason {
   UNLOCK_ON_SHRINKING,
   UPGRADE_CONFLICT,
   DEADLOCK,
-  LOCKSHARED_ON_READ_UNCOMMITTED
+  LOCKSHARED_ON_READ_UNCOMMITTED,
+  ABORTED_TRANS_CALLED
 };
 
 /**
@@ -137,6 +138,8 @@ class TransactionAbortException : public std::exception {
         return "Transaction " + std::to_string(txn_id_) + " aborted on deadlock\n";
       case AbortReason::LOCKSHARED_ON_READ_UNCOMMITTED:
         return "Transaction " + std::to_string(txn_id_) + " aborted on lockshared on READ_UNCOMMITTED\n";
+      case AbortReason::ABORTED_TRANS_CALLED:
+        return "Transaction " + std::to_string(txn_id_) + " called after implict abortion";
     }
     // Todo: Should fail with unreachable.
     return "";

@@ -22,11 +22,8 @@
 #include "execution/plans/distinct_plan.h"
 #include "storage/table/tuple.h"
 
-
 namespace bustub {
-
 struct DistinctKey {  // similar to aggregation_plan
-
   std::vector<Value> distinct_keys_;
 
   bool operator== (const DistinctKey &otherkey) const {
@@ -38,10 +35,11 @@ struct DistinctKey {  // similar to aggregation_plan
         return false;
       }
     }
+
     return true;
   }
 };
-} // namespace bustub
+}   // namespace bustub
 
 
 namespace std {
@@ -95,7 +93,8 @@ class DistinctExecutor : public AbstractExecutor {
   /** The child executor from which tuples are obtained */
   std::unique_ptr<AbstractExecutor> child_executor_;
 
-  std::unordered_map<DistinctKey, Tuple> map_;  //use unordered_map instead of set here, easier to get output when calling Next() 
+  std::unordered_map<DistinctKey, Tuple> map_;
+  //  use unordered_map instead of set here, easier to get output when calling Next()
   std::unordered_map<DistinctKey, Tuple>::iterator map_iterator_;
 };
 }  // namespace bustub

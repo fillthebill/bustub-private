@@ -86,8 +86,112 @@ using ValueType = RID;
 using ComparatorType = GenericComparator<8>;
 using HashFunctionType = HashFunction<KeyType>;
 
+TEST_F(ExecutorTest, SequentialScanWithZeroMatchPredicate) {
+  // Construct query plan
+  TableInfo *table_info = GetExecutorContext()->GetCatalog()->GetTable("test_1");
+  Schema &schema = table_info->schema_;
+  auto *cola_a = MakeColumnValueExpression(schema, 0, "colA");
+  auto *cola_b = MakeColumnValueExpression(schema, 0, "colB");
+  auto *const1000 = MakeConstantValueExpression(ValueFactory::GetIntegerValue(1000));
+  auto *predicate = MakeComparisonExpression(cola_a, const1000, ComparisonType::GreaterThan);
+  auto *out_schema = MakeOutputSchema({{"colA", cola_a}, {"colB", cola_b}});
+  SeqScanPlanNode plan{out_schema, predicate, table_info->oid_};
+
+  // Execute sequential scan
+  std::vector<Tuple> result_set{};
+  GetExecutionEngine()->Execute(&plan, &result_set, GetTxn(), GetExecutorContext());
+
+  // Verify results
+  ASSERT_EQ(result_set.size(), 0);
+}
+
+TEST_F(ExecutorTest, SequentialScanEmptyTable) {
+  // Construct query plan
+  TableInfo *table_info = GetExecutorContext()->GetCatalog()->GetTable("empty_table");
+  Schema &schema = table_info->schema_;
+  auto *cola_a = MakeColumnValueExpression(schema, 0, "colA");
+  auto *out_schema = MakeOutputSchema({{"colA", cola_a}});
+  SeqScanPlanNode plan{out_schema, nullptr, table_info->oid_};
+
+  // Execute sequential scan
+  std::vector<Tuple> result_set{};
+  GetExecutionEngine()->Execute(&plan, &result_set, GetTxn(), GetExecutorContext());
+
+  // Verify results
+  ASSERT_EQ(result_set.size(), 0);
+}
+
+// SELECT colA, colB, colC FROM test_7
+TEST_F(ExecutorTest, SequentialScanCyclicColumn) {
+  // Construct query plan
+  auto *table_info = GetExecutorContext()->GetCatalog()->GetTable("test_7");
+  auto &schema = table_info->schema_;
+  auto *cola_a = MakeColumnValueExpression(schema, 0, "colA");
+  auto *cola_b = MakeColumnValueExpression(schema, 0, "colB");
+  auto *col_c = MakeColumnValueExpression(schema, 0, "colC");
+  auto *out_schema = MakeOutputSchema({{"colA", cola_a}, {"colB", cola_b}, {"colC", col_c}});
+  SeqScanPlanNode plan{out_schema, nullptr, table_info->oid_};
+
+  // Execute sequential scan
+  std::vector<Tuple> result_set{};
+  GetExecutionEngine()->Execute(&plan, &result_set, GetTxn(), GetExecutorContext());
+
+  // Verify results
+  ASSERT_EQ(result_set.size(), TEST7_SIZE);
+
+  for (auto i = 0UL; i < result_set.size(); ++i) {
+    auto &tuple = result_set[i];
+    ASSERT_EQ(tuple.GetValue(out_schema, out_schema->GetColIdx("colA")).GetAs<int64_t>(), static_cast<int64_t>(i));
+    ASSERT_EQ(tuple.GetValue(out_schema, out_schema->GetColIdx("colB")).GetAs<int32_t>(), static_cast<int32_t>(i));
+    ASSERT_EQ(tuple.GetValue(out_schema, out_schema->GetColIdx("colC")).GetAs<int32_t>(),
+              static_cast<int32_t>((i % 10)));
+  }
+}
+
+
+TEST_F(ExecutorTest, SequentialScanWithPredicate) {
+  // Construct query plan
+  TableInfo *table_info = GetExecutorContext()->GetCatalog()->GetTable("test_1");
+  Schema &schema = table_info->schema_;
+  auto *cola_a = MakeColumnValueExpression(schema, 0, "colA");
+  auto *cola_b = MakeColumnValueExpression(schema, 0, "colB");
+  auto *const500 = MakeConstantValueExpression(ValueFactory::GetIntegerValue(1));
+  auto *predicate = MakeComparisonExpression(cola_a, const500, ComparisonType::LessThan);
+  auto *out_schema = MakeOutputSchema({{"colA", cola_a}, {"colB", cola_b}});
+  SeqScanPlanNode plan{out_schema, predicate, table_info->oid_};
+
+  // Execute sequential scan
+  std::vector<Tuple> result_set{};
+  GetExecutionEngine()->Execute(&plan, &result_set, GetTxn(), GetExecutorContext());
+
+  // Verify results
+  for (const auto &tuple : result_set) {
+    ASSERT_TRUE(tuple.GetValue(out_schema, out_schema->GetColIdx("colA")).GetAs<int32_t>() < 500);
+    ASSERT_TRUE(tuple.GetValue(out_schema, out_schema->GetColIdx("colB")).GetAs<int32_t>() < 10);
+  }
+
+  ASSERT_EQ(result_set.size(), 1);
+}
+
+TEST_F(ExecutorTest, SchemaChangeSequentialScan) {
+  // Construct query plan
+  TableInfo *table_info = GetExecutorContext()->GetCatalog()->GetTable("test_1");
+  Schema &schema = table_info->schema_;
+  auto *cola_a = MakeColumnValueExpression(schema, 0, "colA");
+  auto *cola_b = MakeColumnValueExpression(schema, 0, "colB");
+  auto *out_schema = MakeOutputSchema({{"col1", cola_a}, {"col2", cola_b}});
+  SeqScanPlanNode plan{out_schema, nullptr, table_info->oid_};
+
+  // Execute sequential scan
+  std::vector<Tuple> result_set{};
+  GetExecutionEngine()->Execute(&plan, &result_set, GetTxn(), GetExecutorContext());
+
+  // Verify results
+  ASSERT_EQ(result_set.size(), 1000);
+}
+
 // SELECT col_a, col_b FROM test_1 WHERE col_a < 500
-TEST_F(ExecutorTest, DISABLED_SimpleSeqScanTest) {
+TEST_F(ExecutorTest, SimpleSeqScanTest) {
   // Construct query plan
   TableInfo *table_info = GetExecutorContext()->GetCatalog()->GetTable("test_1");
   const Schema &schema = table_info->schema_;
@@ -374,7 +478,7 @@ TEST_F(ExecutorTest, DISABLED_SimpleDeleteTest) {
 }
 
 // SELECT test_1.col_a, test_1.col_b, test_2.col1, test_2.col3 FROM test_1 JOIN test_2 ON test_1.col_a = test_2.col1;
-TEST_F(ExecutorTest, DISABLED_SimpleNestedLoopJoinTest) {
+TEST_F(ExecutorTest, SimpleNestedLoopJoinTest) {
   const Schema *out_schema1;
   std::unique_ptr<AbstractPlanNode> scan_plan1;
   {
@@ -417,8 +521,192 @@ TEST_F(ExecutorTest, DISABLED_SimpleNestedLoopJoinTest) {
   ASSERT_EQ(result_set.size(), 100);
 }
 
+TEST_F(ExecutorTest, NestedLoopJoinInnerTableDuplicateJoinKeys) {
+  // Construct sequential scan of table test_8
+  const Schema *out_schema1{};
+  std::unique_ptr<AbstractPlanNode> scan_plan1{};
+  {
+    auto *table_info = GetExecutorContext()->GetCatalog()->GetTable("test_8");
+    auto &schema = table_info->schema_;
+    auto *col_a = MakeColumnValueExpression(schema, 0, "colA");
+    auto *col_b = MakeColumnValueExpression(schema, 0, "colB");
+    out_schema1 = MakeOutputSchema({{"colA", col_a}, {"colB", col_b}});
+    scan_plan1 = std::make_unique<SeqScanPlanNode>(out_schema1, nullptr, table_info->oid_);
+  }
+
+  // Construct sequential scan of table test_7
+  const Schema *out_schema2{};
+  std::unique_ptr<AbstractPlanNode> scan_plan2{};
+  {
+    auto *table_info = GetExecutorContext()->GetCatalog()->GetTable("test_7");
+    auto &schema = table_info->schema_;
+    auto *col_a = MakeColumnValueExpression(schema, 0, "colA");
+    auto *col_b = MakeColumnValueExpression(schema, 0, "colB");
+    auto *col_c = MakeColumnValueExpression(schema, 0, "colC");
+    out_schema2 = MakeOutputSchema({{"colA", col_a}, {"colB", col_b}, {"colC", col_c}});
+    scan_plan2 = std::make_unique<SeqScanPlanNode>(out_schema2, nullptr, table_info->oid_);
+  }
+
+  // Construct the join plan
+  const Schema *out_schema{};
+  std::unique_ptr<NestedLoopJoinPlanNode> join_plan{};
+  {
+    // Columns from Table 8 have a tuple index of 1 because they are the right side of the join (inner relation)
+    auto *table8_col_a = MakeColumnValueExpression(*out_schema1, 0, "colA");
+    auto *table8_col_b = MakeColumnValueExpression(*out_schema1, 0, "colB");
+
+    // Columns from Table 7 have a tuple index of 0 because they are the left side of the join (outer relation)
+    auto *table7_col_a = MakeColumnValueExpression(*out_schema2, 1, "colA");
+    auto *table7_col_b = MakeColumnValueExpression(*out_schema2, 1, "colB");
+    auto *table7_col_c = MakeColumnValueExpression(*out_schema2, 1, "colC");
+
+    auto *predicate = MakeComparisonExpression(table8_col_b, table7_col_c, ComparisonType::Equal);
+
+    out_schema = MakeOutputSchema({{"table8_colA", table8_col_a},
+                                   {"table8_colB", table8_col_b},
+                                   {"table7_colA", table7_col_a},
+                                   {"table7_colB", table7_col_b}});
+
+    join_plan = std::make_unique<NestedLoopJoinPlanNode>(
+        out_schema, std::vector<const AbstractPlanNode *>{scan_plan1.get(), scan_plan2.get()}, predicate);
+  }
+
+  std::vector<Tuple> result_set{};
+  GetExecutionEngine()->Execute(join_plan.get(), &result_set, GetTxn(), GetExecutorContext());
+
+  // Table 7 contains 100 tuples, partitioned into 10 groups of
+  // 10 that share a join key (colC); Table 8 contains 10 tuples,
+  // with values for colB from 0 .. 9; for each outer tuple, we
+  // should find exactly one inner tuple to match
+
+  // Result set should be empty
+  ASSERT_EQ(result_set.size(), TEST7_SIZE);
+}
+
+TEST_F(ExecutorTest, NestedLoopJoinIntegrated) {
+  // SELECT colA, colB FROM test_1 WHERE colA < 50;
+  const Schema *table1_schema;
+  std::unique_ptr<AbstractPlanNode> table1_scan;
+  {
+    auto *table_info = GetExecutorContext()->GetCatalog()->GetTable("test_1");
+    auto &schema = table_info->schema_;
+    auto col_a = MakeColumnValueExpression(schema, 0, "colA");
+    auto col_b = MakeColumnValueExpression(schema, 0, "colB");
+    auto const50 = MakeConstantValueExpression(ValueFactory::GetIntegerValue(50));
+    auto predicate = MakeComparisonExpression(col_a, const50, ComparisonType::LessThan);
+    table1_schema = MakeOutputSchema({{"colA", col_a}, {"colB", col_b}});
+    table1_scan = std::make_unique<SeqScanPlanNode>(table1_schema, predicate, table_info->oid_);
+  }
+
+  // SELECT colA, colB from test_3;
+  const Schema *table3_schema;
+  std::unique_ptr<AbstractPlanNode> table3_scan;
+  {
+    auto table_info = GetExecutorContext()->GetCatalog()->GetTable("test_3");
+    auto &schema = table_info->schema_;
+    auto col_a = MakeColumnValueExpression(schema, 0, "colA");
+    auto col_b = MakeColumnValueExpression(schema, 0, "colB");
+    table3_schema = MakeOutputSchema({{"colA", col_a}, {"colB", col_b}});
+    table3_scan = std::make_unique<SeqScanPlanNode>(table3_schema, nullptr, table_info->oid_);
+  }
+
+  const Schema *join_schema;
+  std::unique_ptr<NestedLoopJoinPlanNode> join_plan;
+  {
+    // colA and colB have a tuple index of 0 because they are the left side of the join
+    auto table1_cola = MakeColumnValueExpression(*table1_schema, 0, "colA");
+    auto table1_colb = MakeColumnValueExpression(*table1_schema, 0, "colB");
+
+    // colA and colB have a tuple index of 1 because they are the right side of the join
+    auto table3_cola = MakeColumnValueExpression(*table3_schema, 1, "colA");
+    auto table3_colb = MakeColumnValueExpression(*table3_schema, 1, "colB");
+    auto predicate = MakeComparisonExpression(table1_cola, table3_cola, ComparisonType::Equal);
+
+    join_schema = MakeOutputSchema({{"table1_colA", table1_cola},
+                                    {"table1_colB", table1_colb},
+                                    {"table3_colA", table3_cola},
+                                    {"table3_colB", table3_colb}});
+    join_plan = std::make_unique<NestedLoopJoinPlanNode>(
+        join_schema, std::vector<const AbstractPlanNode *>{table1_scan.get(), table3_scan.get()}, predicate);
+  }
+
+  // Execute the JOIN
+  std::vector<Tuple> result_set{};
+  GetExecutionEngine()->Execute(join_plan.get(), &result_set, GetTxn(), GetExecutorContext());
+  ASSERT_EQ(result_set.size(), 50);
+
+  for (const auto &tuple : result_set) {
+    const auto table1_cola = tuple.GetValue(join_schema, join_schema->GetColIdx("table1_colA")).GetAs<int32_t>();
+    const auto table3_cola = tuple.GetValue(join_schema, join_schema->GetColIdx("table3_colA")).GetAs<int32_t>();
+    ASSERT_EQ(table1_cola, table3_cola);
+    ASSERT_LT(table1_cola, 50);
+  }
+}
+
+// SELECT test_7.colA, test_7.colB, test_8.colA, test_8.colB FROM test_7 JOIN test_8 ON test_7.colC = test_8.colB
+TEST_F(ExecutorTest, HashJoinOuterTableDuplicateJoinKeys) {
+  // Construct sequential scan of table test_7
+  const Schema *out_schema1{};
+  std::unique_ptr<AbstractPlanNode> scan_plan1{};
+  {
+    auto *table_info = GetExecutorContext()->GetCatalog()->GetTable("test_7");
+    auto &schema = table_info->schema_;
+    auto *col_a = MakeColumnValueExpression(schema, 0, "colA");
+    auto *col_b = MakeColumnValueExpression(schema, 0, "colB");
+    auto *col_c = MakeColumnValueExpression(schema, 0, "colC");
+    out_schema1 = MakeOutputSchema({{"colA", col_a}, {"colB", col_b}, {"colC", col_c}});
+    scan_plan1 = std::make_unique<SeqScanPlanNode>(out_schema1, nullptr, table_info->oid_);
+  }
+
+  // Construct sequential scan of table test_8
+  const Schema *out_schema2{};
+  std::unique_ptr<AbstractPlanNode> scan_plan2{};
+  {
+    auto *table_info = GetExecutorContext()->GetCatalog()->GetTable("test_8");
+    auto &schema = table_info->schema_;
+    auto *col_a = MakeColumnValueExpression(schema, 0, "colA");
+    auto *col_b = MakeColumnValueExpression(schema, 0, "colB");
+    out_schema2 = MakeOutputSchema({{"colA", col_a}, {"colB", col_b}});
+    scan_plan2 = std::make_unique<SeqScanPlanNode>(out_schema2, nullptr, table_info->oid_);
+  }
+
+  // Construct the join plan
+  const Schema *out_schema{};
+  std::unique_ptr<HashJoinPlanNode> join_plan{};
+  {
+    // Columns from Table 4 have a tuple index of 0 because they are the left side of the join (outer relation)
+    auto *table7_col_a = MakeColumnValueExpression(*out_schema1, 0, "colA");
+    auto *table7_col_b = MakeColumnValueExpression(*out_schema1, 0, "colB");
+    auto *table7_col_c = MakeColumnValueExpression(*out_schema1, 0, "colC");
+
+    // Columns from Table 6 have a tuple index of 1 because they are the right side of the join (inner relation)
+    auto *table8_col_a = MakeColumnValueExpression(*out_schema2, 1, "colA");
+    auto *table8_col_b = MakeColumnValueExpression(*out_schema2, 1, "colB");
+
+    out_schema = MakeOutputSchema({{"table7_colA", table7_col_a},
+                                   {"table7_colB", table7_col_b},
+                                   {"table8_colA", table8_col_a},
+                                   {"table8_colB", table8_col_b}});
+
+    join_plan = std::make_unique<HashJoinPlanNode>(
+        out_schema, std::vector<const AbstractPlanNode *>{scan_plan1.get(), scan_plan2.get()}, table7_col_c,
+        table8_col_b);
+  }
+
+  std::vector<Tuple> result_set{};
+  GetExecutionEngine()->Execute(join_plan.get(), &result_set, GetTxn(), GetExecutorContext());
+
+  // Table 7 contains 100 tuples, partitioned into 10 groups of
+  // 10 that share a join key (colC); Table 8 contains 10 tuples,
+  // with values for colB from 0 .. 9; for each outer tuple, we
+  // should find exactly one inner tuple to match
+
+  // Result set should be empty
+  ASSERT_EQ(result_set.size(), TEST7_SIZE);
+}
+
 // SELECT test_4.colA, test_4.colB, test_6.colA, test_6.colB FROM test_4 JOIN test_6 ON test_4.colA = test_6.colA;
-TEST_F(ExecutorTest, DISABLED_SimpleHashJoinTest) {
+TEST_F(ExecutorTest, SimpleHashJoinTest) {
   // Construct sequential scan of table test_4
   const Schema *out_schema1{};
   std::unique_ptr<AbstractPlanNode> scan_plan1{};
@@ -487,7 +775,7 @@ TEST_F(ExecutorTest, DISABLED_SimpleHashJoinTest) {
 }
 
 // SELECT COUNT(col_a), SUM(col_a), min(col_a), max(col_a) from test_1;
-TEST_F(ExecutorTest, DISABLED_SimpleAggregationTest) {
+TEST_F(ExecutorTest,SimpleAggregationTest) {
   const Schema *scan_schema;
   std::unique_ptr<AbstractPlanNode> scan_plan;
   {
@@ -537,7 +825,7 @@ TEST_F(ExecutorTest, DISABLED_SimpleAggregationTest) {
 }
 
 // SELECT count(col_a), col_b, sum(col_c) FROM test_1 Group By col_b HAVING count(col_a) > 100
-TEST_F(ExecutorTest, DISABLED_SimpleGroupByAggregation) {
+TEST_F(ExecutorTest, SimpleGroupByAggregation) {
   const Schema *scan_schema;
   std::unique_ptr<AbstractPlanNode> scan_plan;
   {
@@ -589,6 +877,122 @@ TEST_F(ExecutorTest, DISABLED_SimpleGroupByAggregation) {
   }
 }
 
+// SELECT COUNT(colA), SUM(colA), MIN(colA), MAX(colA) from test_1;
+TEST_F(ExecutorTest, AggregationIntegrated1) {
+  const Schema *scan_schema;
+  std::unique_ptr<AbstractPlanNode> scan_plan;
+  {
+    auto table_info = GetExecutorContext()->GetCatalog()->GetTable("test_1");
+    auto &schema = table_info->schema_;
+    auto col_a = MakeColumnValueExpression(schema, 0, "colA");
+    scan_schema = MakeOutputSchema({{"colA", col_a}});
+    scan_plan = std::make_unique<SeqScanPlanNode>(scan_schema, nullptr, table_info->oid_);
+  }
+
+  const Schema *agg_schema;
+  std::unique_ptr<AbstractPlanNode> agg_plan;
+  {
+    const AbstractExpression *col_a = MakeColumnValueExpression(*scan_schema, 0, "colA");
+    const AbstractExpression *count_a = MakeAggregateValueExpression(false, 0);
+    const AbstractExpression *sum_a = MakeAggregateValueExpression(false, 1);
+    const AbstractExpression *min_a = MakeAggregateValueExpression(false, 2);
+    const AbstractExpression *max_a = MakeAggregateValueExpression(false, 3);
+
+    agg_schema = MakeOutputSchema({{"countA", count_a}, {"sumA", sum_a}, {"minA", min_a}, {"maxA", max_a}});
+    agg_plan = std::make_unique<AggregationPlanNode>(
+        agg_schema, scan_plan.get(), nullptr, std::vector<const AbstractExpression *>{},
+        std::vector<const AbstractExpression *>{col_a, col_a, col_a, col_a},
+        std::vector<AggregationType>{AggregationType::CountAggregate, AggregationType::SumAggregate,
+                                     AggregationType::MinAggregate, AggregationType::MaxAggregate});
+  }
+
+  // Execute the aggregation
+  std::vector<Tuple> result_set{};
+  GetExecutionEngine()->Execute(agg_plan.get(), &result_set, GetTxn(), GetExecutorContext());
+
+  // Should only have a single tuple in the result set
+  ASSERT_EQ(result_set.size(), 1);
+
+  const Tuple result = result_set.front();
+  const auto count_a_val = result.GetValue(agg_schema, agg_schema->GetColIdx("countA")).GetAs<int32_t>();
+  const auto sum_a_val = result.GetValue(agg_schema, agg_schema->GetColIdx("sumA")).GetAs<int32_t>();
+  const auto min_a_val = result.GetValue(agg_schema, agg_schema->GetColIdx("minA")).GetAs<int32_t>();
+  const auto max_a_val = result.GetValue(agg_schema, agg_schema->GetColIdx("maxA")).GetAs<int32_t>();
+
+  // Should count all tuples
+  ASSERT_EQ(count_a_val, TEST1_SIZE);
+
+  // Should sum from 0 to TEST1_SIZE
+  ASSERT_EQ(sum_a_val, TEST1_SIZE * (TEST1_SIZE - 1) / 2);
+
+  // Minimum should be 0
+  ASSERT_EQ(min_a_val, 0);
+
+  // Maximum should be TEST1_SIZE - 1
+  ASSERT_EQ(max_a_val, TEST1_SIZE - 1);
+}
+
+
+TEST_F(ExecutorTest, AggregationIntegrated2) {
+  const Schema *scan_schema;
+  std::unique_ptr<AbstractPlanNode> scan_plan;
+  {
+    auto *table_info = GetExecutorContext()->GetCatalog()->GetTable("test_1");
+    auto &schema = table_info->schema_;
+    auto col_a = MakeColumnValueExpression(schema, 0, "colA");
+    auto col_b = MakeColumnValueExpression(schema, 0, "colB");
+    auto col_c = MakeColumnValueExpression(schema, 0, "colC");
+    scan_schema = MakeOutputSchema({{"colA", col_a}, {"colB", col_b}, {"colC", col_c}});
+    scan_plan = std::make_unique<SeqScanPlanNode>(scan_schema, nullptr, table_info->oid_);
+  }
+
+  const Schema *agg_schema;
+  std::unique_ptr<AbstractPlanNode> agg_plan;
+  {
+    const AbstractExpression *col_a = MakeColumnValueExpression(*scan_schema, 0, "colA");
+    const AbstractExpression *col_b = MakeColumnValueExpression(*scan_schema, 0, "colB");
+    const AbstractExpression *col_c = MakeColumnValueExpression(*scan_schema, 0, "colC");
+
+    // Make GROUP BY
+    std::vector<const AbstractExpression *> group_by_cols{col_b};
+    const AbstractExpression *groupby_b = MakeAggregateValueExpression(true, 0);
+
+    // Make aggregates
+    std::vector<const AbstractExpression *> aggregate_cols{col_a, col_c};
+    std::vector<AggregationType> agg_types{AggregationType::CountAggregate, AggregationType::SumAggregate};
+    const AbstractExpression *count_a = MakeAggregateValueExpression(false, 0);
+    const AbstractExpression *sum_c = MakeAggregateValueExpression(false, 1);
+
+    // Make HAVING clause
+    const AbstractExpression *having = MakeComparisonExpression(
+        count_a, MakeConstantValueExpression(ValueFactory::GetIntegerValue(100)), ComparisonType::GreaterThan);
+
+    // Create plan
+    agg_schema = MakeOutputSchema({{"countA", count_a}, {"colB", groupby_b}, {"sumC", sum_c}});
+    agg_plan = std::make_unique<AggregationPlanNode>(agg_schema, scan_plan.get(), having, std::move(group_by_cols),
+                                                     std::move(aggregate_cols), std::move(agg_types));
+  }
+
+  std::vector<Tuple> result_set{};
+  GetExecutionEngine()->Execute(agg_plan.get(), &result_set, GetTxn(), GetExecutorContext());
+
+  std::unordered_set<int32_t> encountered{};
+  for (const auto &tuple : result_set) {
+    // Should have countA > 100
+    ASSERT_GT(tuple.GetValue(agg_schema, agg_schema->GetColIdx("countA")).GetAs<int32_t>(), 100);
+
+    // Should have unique colBs.
+    auto col_b = tuple.GetValue(agg_schema, agg_schema->GetColIdx("colB")).GetAs<int32_t>();
+    ASSERT_EQ(encountered.count(col_b), 0);
+    encountered.insert(col_b);
+
+    // Sanity check: ColB should also be within [0, 10).
+    ASSERT_GE(col_b, 0);
+    ASSERT_LT(col_b, 10);
+  }
+}
+
+
 // SELECT colA, colB FROM test_3 LIMIT 10
 TEST_F(ExecutorTest, DISABLED_SimpleLimitTest) {
   auto *table_info = GetExecutorContext()->GetCatalog()->GetTable("test_3");
@@ -617,8 +1021,49 @@ TEST_F(ExecutorTest, DISABLED_SimpleLimitTest) {
   }
 }
 
+// SELECT DISTINCT colA, colC FROM test_7
+TEST_F(ExecutorTest, DistinctMultipleColumns) {
+  auto *table_info = GetExecutorContext()->GetCatalog()->GetTable("test_7");
+  auto &schema = table_info->schema_;
+
+  auto *col_a = MakeColumnValueExpression(schema, 0, "colA");
+  auto *col_c = MakeColumnValueExpression(schema, 0, "colC");
+  auto *out_schema = MakeOutputSchema({{"colA", col_a}, {"colC", col_c}});
+
+  // Construct sequential scan
+  auto seq_scan_plan = std::make_unique<SeqScanPlanNode>(out_schema, nullptr, table_info->oid_);
+
+  // Construct the distinct plan
+  auto distinct_plan = std::make_unique<DistinctPlanNode>(out_schema, seq_scan_plan.get());
+
+  // Execute sequential scan with DISTINCT
+  std::vector<Tuple> result_set{};
+  GetExecutionEngine()->Execute(distinct_plan.get(), &result_set, GetTxn(), GetExecutorContext());
+
+  // Verify results; addition of colA should make all rows distinct
+  ASSERT_EQ(result_set.size(), TEST7_SIZE);
+
+  // Results are unordered
+  std::vector<std::pair<int64_t, int32_t>> results{};
+  results.reserve(result_set.size());
+  std::transform(result_set.cbegin(), result_set.cend(), std::back_inserter(results), [=](const Tuple &tuple) {
+    const int64_t a = tuple.GetValue(out_schema, out_schema->GetColIdx("colA")).GetAs<int64_t>();
+    const int32_t c = tuple.GetValue(out_schema, out_schema->GetColIdx("colC")).GetAs<int32_t>();
+    return std::make_pair(a, c);
+  });
+  std::sort(
+      results.begin(), results.end(),
+      [](const std::pair<int64_t, int32_t> &a, const std::pair<int64_t, int32_t> &b) { return a.first < b.first; });
+
+  for (std::size_t i = 0; i < results.size(); ++i) {
+    const auto a = results[i].first;
+    const auto c = results[i].second;
+    ASSERT_EQ(static_cast<int64_t>(i), a);
+    ASSERT_EQ(static_cast<int32_t>(i % 10), c);
+  }
+}
 // SELECT DISTINCT colC FROM test_7
-TEST_F(ExecutorTest, DISABLED_SimpleDistinctTest) {
+TEST_F(ExecutorTest, SimpleDistinctTest) {
   auto *table_info = GetExecutorContext()->GetCatalog()->GetTable("test_7");
   auto &schema = table_info->schema_;
 

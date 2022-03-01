@@ -148,7 +148,7 @@ class ExtendibleHashTable {
    */
 bool SplitInsert(page_id_t buc_page_id, HASH_TABLE_BUCKET_TYPE* split_page, const KeyType &key, const ValueType &value);
 
-bool Split_Rehash(HashTableDirectoryPage* dir_page, HASH_TABLE_BUCKET_TYPE* split_page, uint32_t split_index);
+bool SplitRehash(HashTableDirectoryPage* dir_page, HASH_TABLE_BUCKET_TYPE* split_page, uint32_t split_index);
 
   /**
    * Optionally merges an empty bucket into it's pair.  This is called by Remove,

@@ -31,7 +31,7 @@ void HashJoinExecutor::Init() {
 			map_[left_key].emplace_back(left_tuple);
 		} else {
 			map_.insert({ left_key, std::vector{left_tuple} });
-		} 
+		}
 	}
 
 	Tuple right_tuple;
@@ -47,12 +47,11 @@ void HashJoinExecutor::Init() {
 		right_key.keys_ = plan_->RightJoinKeyExpression()->Evaluate(&right_tuple, right_executor_->GetOutputSchema());
 		if(map_.count(right_key) != 0) {
 			auto left_tuples = map_.find(right_key)->second;
-			for (auto & left_tuple_hashed : left_tuples) // traverse the whole bucket.
-			{
+			for (auto & left_tuple_hashed : left_tuples)  {  // traverse the whole bucket.
 				output.reserve(col_num);
-				for ( uint32_t i = 0; i < col_num; ++i) {
-					output.push_back(output_schema->GetColumn(i).GetExpr()->
-						EvaluateJoin(&left_tuple_hashed, left_schema, &right_tuple, right_schema));
+				for (uint32_t i = 0; i < col_num; ++i) {
+					output.push_back
+					(output_schema->GetColumn(i).GetExpr()->EvaluateJoin(&left_tuple_hashed, left_schema, &right_tuple, right_schema));
 				}
 				result_.push_back(Tuple(output, GetOutputSchema()));
 				output.clear();
@@ -64,14 +63,14 @@ void HashJoinExecutor::Init() {
 	cur_id = 0;
 }
 
-bool HashJoinExecutor::Next(Tuple *tuple, RID *rid) { 
+bool HashJoinExecutor::Next(Tuple *tuple, RID *rid) {
 	if (cur_id == size_) {
 		return false;
 	}
 	*tuple = result_[cur_id];
 	*rid = result_[cur_id].GetRid();
 	cur_id++;
-	return true; 
+	return true;
 }
 
 }  // namespace bustub

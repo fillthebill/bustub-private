@@ -51,6 +51,7 @@ class LockManager {
     std::condition_variable cv_;
     // txn_id of an upgrading transaction (if any)
     txn_id_t upgrading_ = INVALID_TXN_ID;
+    std::mutex queue_latch_;
   };
 
  public:
@@ -69,6 +70,8 @@ class LockManager {
    * same transaction, i.e. the transaction is responsible for keeping track of
    * its current locks.
    */
+
+  bool ShareChecker(Transaction* txn);
 
   /**
    * Acquire a lock on RID in shared mode. See [LOCK_NOTE] in header file.
@@ -104,9 +107,12 @@ class LockManager {
    */
   bool Unlock(Transaction *txn, const RID &rid);
 
+  bool ABORTED_GUARD(Transaction* txn);
+  bool UpgradeCheck(Transaction* txn, const RID& rid);
+  void removefromqueue(LockRequestQueue& lck_queue, Transaction* txn, LockMode l);
  private:
   std::mutex latch_;
-
+public:
   /** Lock table for lock requests. */
   std::unordered_map<RID, LockRequestQueue> lock_table_;
 };

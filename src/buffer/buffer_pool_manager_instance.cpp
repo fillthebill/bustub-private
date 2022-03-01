@@ -63,7 +63,7 @@ bool BufferPoolManagerInstance::FlushPgImp(page_id_t page_id) {
 
   // write the page using the diskmanager.
   disk_manager_->WritePage(page_id, pages_[frame_id].GetData());
-  pages_[frame_id].is_dirty_ = false;// having been written to disk, consistent with data on disk now.
+  pages_[frame_id].is_dirty_ = false;  // having been written to disk, consistent with data on disk now.
 
 // no need to push into freelist, since there may be several threads pinning the current frame.
   return true;
@@ -92,12 +92,12 @@ Page *BufferPoolManagerInstance::NewPgImp(page_id_t *page_id) {
   frame_id_t frame_avail = 0;
   page_id_t next_page;
 
-  if (free_list_.empty() && (!replacer_->Victim(&frame_avail))) { 
+  if (free_list_.empty() && (!replacer_->Victim(&frame_avail))) {
     // 1. nothing in freelist, nothing available to evict in the buffer bool.
     return nullptr;
   }
 
-  //2. freelis is not empty
+  // 2. freelis is not empty
   if (!free_list_.empty()) {
     frame_avail = free_list_.back();
     free_list_.pop_back();        // get the frame_id;
@@ -127,7 +127,6 @@ Page *BufferPoolManagerInstance::NewPgImp(page_id_t *page_id) {
 
   return &pages_[frame_avail];
   // why allocate page() is called should be further clarified, useful in the case of parallel BPI, I suppose.
-
 }
 
 Page *BufferPoolManagerInstance::FetchPgImp(page_id_t page_id) {
@@ -149,15 +148,15 @@ Page *BufferPoolManagerInstance::FetchPgImp(page_id_t page_id) {
 
     return &pages_[frame_id];
   }   // not in the pagetable, find it from the freelist, then try to victim a frame from replacer.
-    
-  if (free_list_.empty() ) {
+
+  if (free_list_.empty()) {
     if (replacer_->Size() == 0) {
       return nullptr;
-    } 
+    }
               // evict a frame, we have to flush it back to disk before returning the pointer to frame.
     replacer_->Victim(&frame_id);
     if (pages_[frame_id].is_dirty_) {
-      disk_manager_->WritePage(pages_[frame_id].page_id_, pages_[frame_id].GetData()); 
+      disk_manager_->WritePage(pages_[frame_id].page_id_, pages_[frame_id].GetData());
     }
         // update pagetable;
     page_table_.erase(pages_[frame_id].page_id_);
@@ -177,11 +176,9 @@ Page *BufferPoolManagerInstance::FetchPgImp(page_id_t page_id) {
     // update for replacer done solely for cases where the page is found in the replacer.
   page_table_.insert({page_id, frame_id});
   return &pages_[frame_id];
-  
 }
 
 bool BufferPoolManagerInstance::DeletePgImp(page_id_t page_id) {
-  
   const std::lock_guard<std::mutex> lock(latch_);
   DeallocatePage(page_id);
   if (page_table_.count(page_id) == 0) {
@@ -192,7 +189,7 @@ bool BufferPoolManagerInstance::DeletePgImp(page_id_t page_id) {
   if (pages_[frame_id].pin_count_ > 0) {
     return false;
   }
-  if(pages_[frame_id].is_dirty_) {
+  if (pages_[frame_id].is_dirty_) {
     disk_manager_->WritePage(pages_[frame_id].page_id_, pages_[frame_id].GetData());
   }
   page_table_.erase(page_id);
@@ -203,7 +200,6 @@ bool BufferPoolManagerInstance::DeletePgImp(page_id_t page_id) {
   pages_[frame_id].ResetMemory();
 
   free_list_.push_back(frame_id);
-  
 
   // 0.   Make sure you call DeallocatePage!
   // 1.   Search the page table for the requested page (P).

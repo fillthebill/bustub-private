@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include <assert.h>
+#include <cassert>
 #include <iostream>
 #include <string>
 #include <utility>
@@ -69,13 +69,12 @@ HashTableDirectoryPage *HASH_TABLE_TYPE::FetchDirectoryPage() {
 // dir_page may be nullptr;
 // up to this point, page_id != invalid
     assert(dir_page != nullptr);
-    
-    result = reinterpret_cast<HashTableDirectoryPage*>(dir_page->GetData()); 
+    result = reinterpret_cast<HashTableDirectoryPage*>(dir_page->GetData());
   // no need to unpin here! we want to use the page.
   // if invalid, why do we need to make a bucket page for it ?? really??
     return result;
-  }else {
-    // directory page not allocated. 
+  }
+    // directory page not allocated.
     // directory_page_id = page->getid;
     // 1. allocate a new page for direcotory page.
     // 2. init metadata: SetPageId,
@@ -84,8 +83,9 @@ HashTableDirectoryPage *HASH_TABLE_TYPE::FetchDirectoryPage() {
 
     page_id_t new_dir_page_id;
     dir_page = buffer_pool_manager_->NewPage(&new_dir_page_id);
-    if (dir_page == nullptr) return nullptr;
-    
+    if (dir_page == nullptr) {
+      return nullptr;
+    }
     page_id_t new_bucket_page_id;
     new_buc_page = buffer_pool_manager_->NewPage(&new_bucket_page_id);
     if (new_buc_page == nullptr) {
@@ -109,20 +109,19 @@ HashTableDirectoryPage *HASH_TABLE_TYPE::FetchDirectoryPage() {
 // up to this point, page_id != invalid
 //  assert(dir_page != nullptr);
 
-//  result = reinterpret_cast<HashTableDirectoryPage*>(dir_page->GetData()); 
+//  result = reinterpret_cast<HashTableDirectoryPage*>(dir_page->GetData());
   //  no need to unpin here! we want to use the page.
   //  if invalid, why do we need to make a bucket page for it ?? really??
     return result;
-
-  } 
 }
 
-//  what if  the bucket_page_id is illegal, 
-//  this is wrong, we need to cast it to HASH_TABLE_BUCKET_TYPE, the return value is of type Page* now, 
+//  what if  the bucket_page_id is illegal,
+//  this is wrong, we need to cast it to HASH_TABLE_BUCKET_TYPE, the return value is of type Page* now,
 template <typename KeyType, typename ValueType, typename KeyComparator>
 HASH_TABLE_BUCKET_TYPE *HASH_TABLE_TYPE::FetchBucketPage(page_id_t bucket_page_id) {
   HashTableDirectoryPage* dir_page = FetchDirectoryPage();
-  for (uint32_t page_index = 0; page_index < (1<< dir_page->GetGlobalDepth()); page_index++) {
+  uint32_t limit = (1<< dir_page->GetGlobalDepth());
+  for (uint32_t page_index = 0; page_index < limit; page_index++) {
     if (dir_page->GetBucketPageId(page_index) == bucket_page_id) {
       return reinterpret_cast<HASH_TABLE_BUCKET_TYPE*>(buffer_pool_manager_->FetchPage(bucket_page_id)->GetData());
     }
@@ -138,7 +137,7 @@ bool HASH_TABLE_TYPE::GetValue(Transaction *transaction, const KeyType &key, std
   //  fetch directory page
   //  find bucket page id
   //  Getvalue from the bucket,
-  //  remember to unpin(), since the bucket and directory page actually lies in the buffer pool. 
+  //  remember to unpin(), since the bucket and directory page actually lies in the buffer pool.
   table_latch_.RLock();
   HashTableDirectoryPage* dir_page = FetchDirectoryPage();
   page_id_t buc_page_id = KeyToPageId(key, dir_page);
@@ -146,7 +145,7 @@ bool HASH_TABLE_TYPE::GetValue(Transaction *transaction, const KeyType &key, std
 
   Page* bucket_as_page = reinterpret_cast<Page*>(buc_page);
   bucket_as_page->RLatch();
-  bool res = buc_page->GetValue(key,comparator_, result);
+  bool res = buc_page->GetValue(key, comparator_, result);
   //  buffer_pool_manager_->Unpin(directory_page_id_, false);
   bucket_as_page->RUnlatch();
   table_latch_.RUnlock();
@@ -161,9 +160,10 @@ bool HASH_TABLE_TYPE::GetValue(Transaction *transaction, const KeyType &key, std
  *****************************************************************************/
 template <typename KeyType, typename ValueType, typename KeyComparator>
 bool HASH_TABLE_TYPE::Insert(Transaction *transaction, const KeyType &key, const ValueType &value) {
-  //if full, call split insert;
-  
-  table_latch_.WLock();// the function fetch directorypage would read the directory page.
+  //  if full, call split insert;
+
+  table_latch_.WLock();
+  // the function fetch directorypage would read the directory page.
   HashTableDirectoryPage* dir_page = FetchDirectoryPage();
   table_latch_.WUnlock();
 
@@ -171,14 +171,11 @@ bool HASH_TABLE_TYPE::Insert(Transaction *transaction, const KeyType &key, const
   page_id_t buc_page_id = KeyToPageId(key, dir_page);
   HASH_TABLE_BUCKET_TYPE* buc_page = FetchBucketPage(buc_page_id);
 
-  //  what verification check is needed here? since the bucketpage may be delete by someone, 
+  //  what verification check is needed here? since the bucketpage may be delete by someone,
   //  after release the read lock on table. thus cannot be insert into.
 
   //  the validity of the pointer to bucket page is coupled with whether the directory page has been changed.
-  //  if(buc_page == nullptr) {
-   //   std::cout<< "buc_page error"<<"key is "<< key << "value is "<< value <<std::endl;
-  //   return false;
-  //  }
+
   bool result = false;
   Page* buc_as_page = reinterpret_cast<Page*>(buc_page);
     buc_as_page->WLatch();
@@ -187,61 +184,48 @@ bool HASH_TABLE_TYPE::Insert(Transaction *transaction, const KeyType &key, const
   //  need to upgrade the table_latch to write latch.
   //  if simply release the readlock then acquire the write lock
   //  Other threads may change the dir_page and buc_page,
-  //  which could make the buc_page we select to be wrong(e.g. after directory expansion, key is rehashed to another buck.).
-  //  one way to bypass, is to decide again the bucket to insert and whether the bucket is full after acquisition of the write lock.
-  //  if things changed, 
-  
-  //  of course, taking wlock() all the way through insert() would be correct, but notice that most insert() operations 
+  //  which could make the buc_page we select to be wrong
+  //  (e.g. after directory expansion, key is rehashed to another buck.).
+  //  one way to bypass, is to decide again the bucket to insert and whether the bucket
+  //  is full after acquisition of the write lock.
+  //  if things changed,
+
+  //  of course, taking wlock() all the way through insert() would be correct, but notice that most insert() operations
   //  won't encounter a full buckage, we need to use readlock in most insert operations to enhance parellelism.
 
   if (buc_page->IsFull()) {
 //    buffer_pool_manager_->Unpin(buc_page);
-    //  std::cout<< "before acquisition, warning! a full bucket to split"<<std::endl;
     table_latch_.RUnlock();
     buc_as_page->WUnlatch();
-    //  std::cout<< "waiting for write lock"<<std::endl;
     table_latch_.WLock();
     buc_as_page->WLatch();
-    //  deadlock here, the reason maybe that, another thread tries to delete, with the writelock, it would only release write lock 
+    //  deadlock here, the reason maybe that, another thread tries to delete,
+    // with the writelock, it would only release write lock
     //  after the write lock on the bucket has been acquired.
-    //  std::cout<< "after acquisition, warning! a full bucket to split"<<std::endl;
-
       if (buc_page_id == KeyToPageId(key, dir_page) && buc_page->IsFull()) {
         result = SplitInsert(buc_page_id, buc_page, key, value);
         //  splitinsert with table latch & buc_page on.
         //  these two locks are released after executing this fuction.
-      }else if (buc_page_id != KeyToPageId(key, dir_page)){
+      } else if (buc_page_id != KeyToPageId(key, dir_page)) {
         table_latch_.WUnlock();
         buc_as_page->WUnlatch();
-      //      std::cout<< "try to insert again"<<std::endl;
         Insert(transaction, key, value);
-      }else {
+      } else {
         //   still hash to the same bucket, but not full anymore.
-        //  std::cout<< "hashed to the same bucket "<<std::endl;
         buc_page->Insert(key, value, comparator_);
         table_latch_.WUnlock();
         buc_as_page->WUnlatch();
       }
 
-    //  if(result == false) {
-          //  std::cout<< "full insertion failed "<<"key is "<< key << "value is "<< value <<std::endl;
-    //   }
-    //  if(result) {
-    //   std::cout<< "split insert success. "<<"key is "<< key << "value is "<< value <<std::endl;
-    //  }
-
-  }else {
-    
+  } else {
     result = buc_page->Insert(key, value, comparator_);
     buc_as_page->WUnlatch();
-      
-    if (result == false) {
+    if (!result) {
           //  std::cout<< "non full insertion failed"<<"key is "<< key << "value is "<< value <<std::endl;
     }
     buffer_pool_manager_->UnpinPage(buc_page_id, true);
     buffer_pool_manager_->UnpinPage(directory_page_id_, false);
     table_latch_.RUnlock();
-
   }
   //  2. upin the bucket page.
   //  table_latch_.WUnlock();
@@ -249,21 +233,21 @@ bool HASH_TABLE_TYPE::Insert(Transaction *transaction, const KeyType &key, const
 }
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
-bool HASH_TABLE_TYPE::SplitInsert(page_id_t buc_page_id, HASH_TABLE_BUCKET_TYPE* split_page, const KeyType &key, const ValueType &value) {
+bool HASH_TABLE_TYPE::SplitInsert(page_id_t buc_page_id,
+  HASH_TABLE_BUCKET_TYPE* split_page, const KeyType &key, const ValueType &value) {
   //  invariance: before calling SplitInsert(), write lock of table latch and the split page has been acquired.
   //  before return, these two locks have to be released.
 
-  //  fetch bucket page only. 
+  //  fetch bucket page only.
   //  if there is room to insert the k-v pair, save a IO cycle without fetching dir_page.
   //  what if there is no room in the buffer pool?
-  
+
   assert(split_page != nullptr);
 
-  // SplitInsert only deals with the case where split_page is full  
+  // SplitInsert only deals with the case where split_page is full
 
   HashTableDirectoryPage* dir_page = FetchDirectoryPage();
   if (dir_page == nullptr) {
-      //  std::cout<< "dir_page error"<<"key is "<< key << "value is "<< value <<std::endl;
     return false;
   }
 //  when bucket is full, have to split the bucket page.
@@ -272,13 +256,12 @@ bool HASH_TABLE_TYPE::SplitInsert(page_id_t buc_page_id, HASH_TABLE_BUCKET_TYPE*
 //  2.1 save content in the bucket, create image bucket, reset content in the split bucket to zero.
 //  2.2 re hash elements in the bucket
 //  3. call splitinsert() recursively;
-  bool SplitResult;
-//  how to rehash, 
+  bool split_result;
+//  how to rehash,
 //  how to find directory index of the image bucket.
 
   uint32_t split_page_index = KeyToDirectoryIndex(key, dir_page);
-  
-  
+
 //  array_ = buc_page->BucketCopy(); // return the kv pairs in it;
 //  no need to save it temporarily.
 
@@ -286,27 +269,21 @@ bool HASH_TABLE_TYPE::SplitInsert(page_id_t buc_page_id, HASH_TABLE_BUCKET_TYPE*
   //  directory expasion and local/global depth update are executed in this function.
   //  remember to unpin the image page inside the fuction split_rehash
   while (split_page->IsFull()) {
-
-    if (!(SplitResult = Split_Rehash(dir_page, split_page, split_page_index)) ) 
-      //  calling split_rehash with hashtable latch and page lock on.
+    if (!(split_result = SplitRehash(dir_page, split_page, split_page_index))) {
+    //  calling split_rehash with hashtable latch and page lock on.
       //  still acuiqre them after exectution. to be optimized. reconsider where to unpin and unlock.
-      {     //  std::cout<< "split_rehash error"<<"key is "<< key << "value is "<< value <<std::endl;
-
         return false;
       }
-     //  std::cout<< "rehash index "<< split_page_index << " id " << dir_page->GetBucketPageId(split_page_index) <<"key is "<< key << "value is "<< value <<std::endl;
-  //  std::cout<<"after split ..." <<std::endl;
      //  dir_page->PrintDirectory();
-
   }
- //  std::cout<< " new index is " << KeyToDirectoryIndex(key, dir_page) <<std::endl;
-
   page_id_t new_page_id = KeyToPageId(key, dir_page);
   HASH_TABLE_BUCKET_TYPE* new_page = FetchBucketPage(new_page_id);
   Page* new_page_casted = reinterpret_cast<Page*>(new_page);
-  if(new_page == nullptr) return false;
-  
-  if(new_page_id != buc_page_id) {
+  if (new_page == nullptr) {
+    return false;
+  }
+
+  if (new_page_id != buc_page_id) {
     new_page_casted->WLatch();
   }
   new_page->Insert(key, value, comparator_);
@@ -328,7 +305,7 @@ bool HASH_TABLE_TYPE::SplitInsert(page_id_t buc_page_id, HASH_TABLE_BUCKET_TYPE*
 }
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
-bool HASH_TABLE_TYPE::Split_Rehash(HashTableDirectoryPage* dir_page,
+bool HASH_TABLE_TYPE::SplitRehash(HashTableDirectoryPage* dir_page,
 HASH_TABLE_BUCKET_TYPE* split_page, uint32_t split_index) {
   // invariance: write lock on hashtable and the split page has been acquired before calling Split_rehash();
   // still on after this function. TO Be Optimized.
@@ -554,8 +531,8 @@ void HASH_TABLE_TYPE::Merge(HashTableDirectoryPage* dir_page, uint32_t merge_ind
   page_id_t image_page_id = dir_page->GetBucketPageId(image_index);
   // the first index whose content is the page_id of the page to merge.
   uint32_t step = (1 << local_depth);
-
-  if ( dir_page->GetLocalDepth(image_index) != local_depth || image_index >= (1 << global_depth) ) {
+  uint32_t temp = (1 << global_depth);
+  if ( dir_page->GetLocalDepth(image_index) != local_depth || image_index >= temp ) {
     return;
   }
 

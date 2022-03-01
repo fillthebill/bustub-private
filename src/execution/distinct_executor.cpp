@@ -16,7 +16,8 @@ namespace bustub {
 
 DistinctExecutor::DistinctExecutor(ExecutorContext *exec_ctx, const DistinctPlanNode *plan,
                                    std::unique_ptr<AbstractExecutor> &&child_executor)
-    : AbstractExecutor(exec_ctx), plan_(plan), child_executor_(std::move(child_executor)), map_{}, map_iterator_(map_.begin()) {}
+    : AbstractExecutor(exec_ctx), plan_(plan), child_executor_(std::move(child_executor)),
+    map_{}, map_iterator_(map_.begin()) {}
 
 void DistinctExecutor::Init() {
 	// for each tuple from child executor,
@@ -47,11 +48,11 @@ bool DistinctExecutor::Next(Tuple *tuple, RID *rid) {
 	if(map_iterator_ == map_.end()) {
 		return false;
 	}
-	
+
 	*tuple = map_iterator_->second;
 	*rid = map_iterator_->second.GetRid();
-	map_iterator_ ++;
-	return true; 
+	map_iterator_++;
+	return true;
 }
 
 }  // namespace bustub

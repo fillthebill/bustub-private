@@ -44,11 +44,11 @@ bool LRUReplacer::Victim(frame_id_t *frame_id) {
   std::lock_guard<std::mutex> guard(frame_list_mutex_);
   if (Size() == 0) {
     return false;
-  } 
-  
+  }
+
   *frame_id = tail_->prev_->l_data_;
   lru_map_.erase(*frame_id);
-  size_ --;
+  size_--;
   Remove(tail_->prev_);
   return true;
   // shall we remove ?? who has the priviledge to change data member of LRU?? remove, insert? and what/??
@@ -67,7 +67,7 @@ void LRUReplacer::Pin(frame_id_t frame_id) {
 
   Remove(node2remove);
   lru_map_.erase(frame_id);
-  size_ --;
+  size_--;
 }
 
 void LRUReplacer::Unpin(frame_id_t frame_id) {
@@ -81,7 +81,7 @@ void LRUReplacer::Unpin(frame_id_t frame_id) {
   auto node2insert = new FrameListNode(frame_id);
   std::lock_guard<std::mutex> guard(frame_list_mutex_);
   lru_map_.insert({frame_id, node2insert});
-  size_ ++;
+  size_++;
   Insert(node2insert);
   //    delete node2insert;
 }

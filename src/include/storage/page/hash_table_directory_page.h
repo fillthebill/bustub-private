@@ -190,7 +190,8 @@ class HashTableDirectoryPage {
   page_id_t page_id_;
   lsn_t lsn_;
   uint32_t global_depth_{0};
-  uint8_t local_depths_[DIRECTORY_ARRAY_SIZE];  // uint8_t: integer type with 8bits, DIRECTORY_ARRAY_SIZE is defined as 512, 
+  uint8_t local_depths_[DIRECTORY_ARRAY_SIZE];
+    // uint8_t: integer type with 8bits, DIRECTORY_ARRAY_SIZE is defined as 512,
   page_id_t bucket_page_ids_[DIRECTORY_ARRAY_SIZE];
 };
 

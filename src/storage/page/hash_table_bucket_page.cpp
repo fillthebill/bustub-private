@@ -26,9 +26,8 @@ MappingType* HASH_TABLE_BUCKET_TYPE::GetData() {
 template <typename KeyType, typename ValueType, typename KeyComparator>
 bool HASH_TABLE_BUCKET_TYPE::GetValue(KeyType key, KeyComparator cmp, std::vector<ValueType> *result) {
   bool res = false;
-  
   for (uint32_t i = 0; i < BUCKET_ARRAY_SIZE; ++i) {
-    if (cmp(key, array_[i].first)==0 && IsReadable(i)) {
+    if (cmp(key, array_[i].first) == 0 && IsReadable(i)) {
       res = true;
       result->push_back(array_[i].second);
     }
@@ -39,7 +38,6 @@ bool HASH_TABLE_BUCKET_TYPE::GetValue(KeyType key, KeyComparator cmp, std::vecto
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
 bool HASH_TABLE_BUCKET_TYPE::Insert(KeyType key, ValueType value, KeyComparator cmp) {
-
   //  examine duplication
   //  isreadable means that it's valid, incoming pair could be inserted the first position where(!isreadable())
   //  invariance: a valid pair is always readable, an invalid pair is not.
@@ -47,7 +45,7 @@ bool HASH_TABLE_BUCKET_TYPE::Insert(KeyType key, ValueType value, KeyComparator 
   //  if not occupied, that place has not been inserted any element from the beginning.
 
   for (uint32_t i = 0; i < BUCKET_ARRAY_SIZE; ++i) {
-    if (cmp(array_[i].first, key)==0 && array_[i].second == value && IsReadable(i)) {
+    if (cmp(array_[i].first, key) == 0 && array_[i].second == value && IsReadable(i)) {
       return false;
     }
   }
@@ -58,19 +56,18 @@ bool HASH_TABLE_BUCKET_TYPE::Insert(KeyType key, ValueType value, KeyComparator 
       SetReadable(i);
       SetOccupied(i);
       return true;
-    } 
+    }
   }
 
   return false;
 
 //  the codes below is problematic, duplication does not mean two same kv pair in the bucket.
-//  whether a duplicate kv pair exist  
-  
+//  whether a duplicate kv pair exist
 //  what a lesson
 
 //  whether the array is full.
 //  for(int i = 0; i < BUCKET_ARRAY_SIZE; ++i) {
-//  which bit would i looking up??   position in array of chars: (i-1)/8 + 1; which bit?? i-(position-1 <<3), 
+//  which bit would i looking up??   position in array of chars: (i-1)/8 + 1; which bit?? i-(position-1 <<3),
 //  mask should be(for 8 bits) 1<<(8-(....))
 //    int char_rank = (i-1)>>3 + 1;
 //   int bit_rank = i-((char_rank-1)<<3);// from 1 to 8, not 0 to 7, mask would be 1<<(8-bit_rank)
@@ -79,17 +76,15 @@ bool HASH_TABLE_BUCKET_TYPE::Insert(KeyType key, ValueType value, KeyComparator 
 //  array_[i].second = value;
 //  occupied_[char_rank] |= (1<<(8-bit_rank));
 //  readable_[char_rank] |= (1<<(8-bit_rank));
-//  return true; 
+//  return true;
 // not full, found a non-occupied place, insert successfully.
-//  } 
+//  }
 //  }
 // return false;full
-
 }
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
 bool HASH_TABLE_BUCKET_TYPE::Remove(KeyType key, ValueType value, KeyComparator cmp) {
-  
   // if kv matching, decide whether isreadeable(),which means that it's a valid pair to be removed
   // then change readable to 0, using setreadable.
 
@@ -104,7 +99,7 @@ bool HASH_TABLE_BUCKET_TYPE::Remove(KeyType key, ValueType value, KeyComparator 
       // readable_[char_rank] &= (~(1<<(8-bit_rank)));
 
       if (IsReadable(i)) {
-        // set not readable 
+        // set not readable
         uint8_t mask = CalculateMask(i);
         uint32_t char_rank = (i >> 3);
         readable_[char_rank] &= (~mask);
@@ -134,12 +129,8 @@ template <typename KeyType, typename ValueType, typename KeyComparator>
 bool HASH_TABLE_BUCKET_TYPE::IsOccupied(uint32_t bucket_idx) const {
   uint32_t char_rank = (bucket_idx>>3);
   uint8_t mask = CalculateMask(bucket_idx);
-  if (mask & occupied_[char_rank]) {
+  return (mask & occupied_[char_rank]);
     // not zero after mask, the corresponding bit is one,
-    return true;
-  }
-
-  return false;
 }
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
@@ -160,13 +151,10 @@ void HASH_TABLE_BUCKET_TYPE::SetOccupied(uint32_t bucket_idx) {
 template <typename KeyType, typename ValueType, typename KeyComparator>
 bool HASH_TABLE_BUCKET_TYPE::IsReadable(uint32_t bucket_idx) const {
   uint32_t char_rank = ((bucket_idx) >> 3);  //  bucket number start from 0, # of chars,
-  uint32_t bit_rank = bucket_idx-(char_rank << 3); //  from 0 to 7;
+  uint32_t bit_rank = bucket_idx-(char_rank << 3);  //  from 0 to 7;
   uint8_t mask = 1 << (7-bit_rank);  //  0 to 7 mapped to 7 to 0;
-  if (mask & readable_[char_rank]) {
-    //  not zero after mask, the corresponding bit is one, 
-    return true;
-  }
-  return false;
+  return (mask & readable_[char_rank]);
+    //  not zero after mask, the corresponding bit is one,
 }
 
 template <typename KeyType, typename ValueType, typename KeyComparator>

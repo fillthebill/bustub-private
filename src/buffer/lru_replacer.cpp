@@ -15,24 +15,16 @@
 namespace bustub {
 
 LRUReplacer::LRUReplacer(size_t num_pages) {
-  head_ = new FrameListNode(-1);
-  tail_ = new FrameListNode(-1);
-  head_->next_ = tail_;
-  tail_->prev_ = head_;
+  free_list_ = {};
+  lru_map_ = {};
   capacity_ = num_pages;
   size_ = 0;
-  lru_map_.reserve(num_pages);
+  //  lru_map_.reserve(num_pages);
 }
 
 // initialization. head and tail are consecutive,
 
-LRUReplacer::~LRUReplacer() {
-  for (size_t i = 0; i < size_ + 2; ++i) {
-    tail_ = head_->next_;
-    delete head_;
-    head_ = tail_;
-  }
-}
+LRUReplacer::~LRUReplacer() = default;
 
 // victim
 // find the frame_id according to LRU algorithm
@@ -46,12 +38,10 @@ bool LRUReplacer::Victim(frame_id_t *frame_id) {
     return false;
   }
 
-  *frame_id = tail_->prev_->l_data_;
+  *frame_id = free_list_.back();
   lru_map_.erase(*frame_id);
-  size_--;
-  Remove(tail_->prev_);
+  free_list_.pop_back();
   return true;
-  // shall we remove ?? who has the priviledge to change data member of LRU?? remove, insert? and what/??
 }
 
 void LRUReplacer::Pin(frame_id_t frame_id) {
@@ -60,14 +50,13 @@ void LRUReplacer::Pin(frame_id_t frame_id) {
   // remove(ListNode*) from the list;
   // remove the listnode from the map;
   std::lock_guard<std::mutex> guard(frame_list_mutex_);
-  if (lru_map_.count(frame_id) == 0) {
+  if (lru_map_.find(frame_id) == lru_map_.end()) {
     return;
   }
   auto node2remove = lru_map_[frame_id];
 
-  Remove(node2remove);
+  free_list_.erase(node2remove);
   lru_map_.erase(frame_id);
-  size_--;
 }
 
 void LRUReplacer::Unpin(frame_id_t frame_id) {
@@ -75,17 +64,18 @@ void LRUReplacer::Unpin(frame_id_t frame_id) {
   // put it into map;
   //
   // insert into map, list, ?? how to solve it??
-  if (lru_map_.count(frame_id) != 0) {
+  std::lock_guard<std::mutex> guard(frame_list_mutex_);
+  if (lru_map_.find(frame_id) != lru_map_.end()) {
     return;
   }
-  auto node2insert = new FrameListNode(frame_id);
-  std::lock_guard<std::mutex> guard(frame_list_mutex_);
-  lru_map_.insert({frame_id, node2insert});
-  size_++;
-  Insert(node2insert);
+  if (Size() == capacity_) {
+    return;
+  }
+  free_list_.push_front(frame_id);
+  lru_map_[frame_id] = free_list_.begin();
   //    delete node2insert;
 }
 
-size_t LRUReplacer::Size() { return size_; }
+size_t LRUReplacer::Size() { return free_list_.size(); }
 
 }  // namespace bustub

@@ -13,6 +13,7 @@
 #pragma once
 
 #include <vector>
+#include <mutex>  // NOLINT
 
 #include "buffer/buffer_pool_manager.h"
 #include "buffer/buffer_pool_manager_instance.h"
@@ -24,6 +25,7 @@ namespace bustub {
 
 class ParallelBufferPoolManager : public BufferPoolManager {
  private:
+  std::mutex latch_;
   std::vector<BufferPoolManagerInstance *> bpmi_;
   uint32_t starting_index_ = 0;
 

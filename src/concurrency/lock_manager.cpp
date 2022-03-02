@@ -114,7 +114,7 @@ exam:
           return false;
         }
         if (!ShareChecker(txn)) return false;
-        if(txn->IsSharedLocked(rid) || txn->IsExclusiveLocked(rid)) return true;
+        if (txn->IsSharedLocked(rid) || txn->IsExclusiveLocked(rid)) return true;
         goto exam;
         //  when this thread is woken up and scheduled, the process of going through lock_queue should be done again.
       }

@@ -38,6 +38,7 @@ class InsertExecutor : public AbstractExecutor {
    */
   InsertExecutor(ExecutorContext *exec_ctx, const InsertPlanNode *plan,
                  std::unique_ptr<AbstractExecutor> &&child_executor);
+  void InsertWithIndexUpdate(Tuple tuple);
 
   /** Initialize the insert */
   void Init() override;
@@ -59,6 +60,10 @@ class InsertExecutor : public AbstractExecutor {
  private:
   /** The insert plan node to be executed*/
   const InsertPlanNode *plan_;
+  Catalog* catalog_;
+  TableInfo* table_info_;
+  TableHeap* table_heap_;
+  std::unique_ptr<AbstractExecutor> child_executor_;
 };
 
 }  // namespace bustub

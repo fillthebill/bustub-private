@@ -110,9 +110,11 @@ class LockManager {
   bool ABORTED_GUARD(Transaction* txn);
   bool UpgradeCheck(Transaction* txn, const RID& rid);
   void removefromqueue(LockRequestQueue& lck_queue, Transaction* txn, LockMode l);
+
  private:
   std::mutex latch_;
-public:
+
+ public:
   /** Lock table for lock requests. */
   std::unordered_map<RID, LockRequestQueue> lock_table_;
 };

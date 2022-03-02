@@ -65,7 +65,7 @@ Page *ParallelBufferPoolManager::NewPgImp(page_id_t *page_id) {
   // starting index and return nullptr
   // 2.   Bump the starting index (mod number of instances) to start search at a different BPMI each time this function
   // is called
-
+  std::scoped_lock lck{latch_};
   size_t limit = bpmi_.size();
   uint32_t old_starting_index = starting_index_;
   Page *newpage;

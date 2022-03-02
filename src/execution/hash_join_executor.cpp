@@ -22,6 +22,7 @@ HashJoinExecutor::HashJoinExecutor(ExecutorContext *exec_ctx, const HashJoinPlan
 
 void HashJoinExecutor::Init() {
 	left_executor_->Init();
+	right_executor_->Init();
 	Tuple left_tuple;
 	RID left_rid;
 	while (left_executor_->Next(&left_tuple, &left_rid)) {

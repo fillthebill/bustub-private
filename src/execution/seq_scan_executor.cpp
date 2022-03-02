@@ -42,7 +42,7 @@ bool SeqScanExecutor::Next(Tuple *tuple, RID *rid) {
 		prev_tuple = *table_iterator_;
 		// const Tuple* prev_tuple = &(*table_iterator_)
 		// this is buggy, after incrementing iterator, the value pointed to has changed.
-		prev_rid = table_iterator_->GetRid();
+		prev_rid = table_iterator_->GetRid();   // operator-> has been overloaded, return the tuple_.
 		++table_iterator_;
 	} while ( predicate != nullptr && !predicate->Evaluate(&prev_tuple, &table_schema).GetAs<bool>() );
 

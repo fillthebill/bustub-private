@@ -29,6 +29,8 @@ bool UpdateExecutor::Next([[maybe_unused]] Tuple *tuple, RID *rid) {
   Tuple t_new;
   RID rid_;
 
+  auto txn = exec_ctx_->GetTransaction();
+  auto lck_mgr = exec_ctx_->GetLockManager();
   // exec the child, and update it.
   while (1) {
     try {
@@ -40,7 +42,42 @@ bool UpdateExecutor::Next([[maybe_unused]] Tuple *tuple, RID *rid) {
     }
 
     t_new = GenerateUpdatedTuple(t_old);
+
+    // take on ex lock before update.
+    // case 1: s locked, then upgrade
+    // case 2: NO lock, take E lock
+    // case 3: E locked, nothing.
+    // do not  need to consider unlock() here, would be concerned by commit/abort()
+
+    if (txn->IsSharedLocked(rid_)) {
+      // case 1
+      if (!lck_mgr->LockUpgrade(txn, rid_)) {
+        return false;
+      }
+    } else if(!txn->IsExclusiveLocked(rid_)) {
+      if(!lck_mgr->LockExclusive(txn, rid_)) {
+        return false;
+      }
+    }
+    // otherwise, already E locked.
+
     table_info_->table_.get()->UpdateTuple(t_new, rid_, exec_ctx_->GetTransaction());
+  
+    for(auto & index_info : exec_ctx_->GetCatalog()->GetTableIndexes(table_info_->name_)) {
+      index_info->index_->DeleteEntry(t_old.KeyFromTuple(table_info_->schema_,
+       *index_info->index_->GetKeySchema(), index_info->index_->GetKeyAttrs()), rid_, exec_ctx_->GetTransaction());
+    
+      index_info->index_->InsertEntry(t_new.KeyFromTuple(table_info_->schema_,
+        *index_info->index_->GetKeySchema(), index_info->index_->GetKeyAttrs()), rid_, exec_ctx_->GetTransaction());
+
+      IndexWriteRecord index_w_record(rid_, table_info_->oid_, WType::DELETE, t_new, index_info->index_oid_,
+        exec_ctx_->GetCatalog());
+
+      index_w_record.old_tuple_ = t_old;
+      txn->GetIndexWriteSet()->push_back(index_w_record);
+
+    }
+
   }
 
   return false;
